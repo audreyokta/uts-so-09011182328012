@@ -1,67 +1,45 @@
-
 #!/bin/bash
 # Nama  : Audrey Okta Ramadhini
 # NIM   : 09011182328012
-# Kelas : SKU7A
+# Kelas : SKU3B
 
-SOURCE_DIR="$HOME/data_09011182328012"
-BACKUP_DIR="$HOME/backup_09011182328012"
-LOG_FILE="$BACKUP_DIR/backup.log"
+# 2. Variabel direktori sumber, tujuan, dan file log
+NIM="09011182328012"
+SOURCE_DIR="$HOME/data_${NIM}"
+BACKUP_DIR="$HOME/backup_${NIM}"
+LOG_FILE="${BACKUP_DIR}/backup.log"
+FILE_LIST="${BACKUP_DIR}/daftar_file.txt"
 
-# Membuat direktori tujuan
+# Fitur Pengembangan 1: Parameter ekstensi file (default: txt)
+EXT="${1:-txt}"
+
+# 3. Membuat direktori tujuan jika belum ada
 mkdir -p "$BACKUP_DIR"
 
-# Memastikan direktori sumber tersedia
-if [ ! -d "$SOURCE_DIR" ]; then
-    echo "Direktori sumber tidak ditemukan."
-    exit 1
-fi
-
-# Menentukan nama arsip berdasarkan tanggal dan waktu
+# Menyiapkan format tanggal dan jam
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-DATETIME=$(date '+%Y-%m-%d %H:%M:%S')
-ARCHIVE="backup_09011182328012_${TIMESTAMP}.tar.gz"
-ARCHIVE_PATH="$BACKUP_DIR/$ARCHIVE"
-FILE_LIST=$(mktemp)
+LOG_DATE=$(date +"%Y-%m-%d %H:%M:%S")
+ARCHIVE_NAME="backup_${NIM}_${TIMESTAMP}.tar.gz"
+ARCHIVE_PATH="${BACKUP_DIR}/${ARCHIVE_NAME}"
 
-# Mencari seluruh file TXT termasuk subdirektori
-find "$SOURCE_DIR" -type f -name "*.txt" -print0 > "$FILE_LIST"
-FILE_COUNT=$(tr -cd '\0' < "$FILE_LIST" | wc -c)
+# 4. Mencari semua file .txt (termasuk di subdirektori) dan menyimpan daftarnya
+find "$SOURCE_DIR" -type f -name "*.${EXT}" > "$FILE_LIST"
 
-# Memastikan terdapat file untuk diarsipkan
-if [ "$FILE_COUNT" -eq 0 ]; then
-    echo "Tidak ada file TXT untuk di-backup."
-    rm -f "$FILE_LIST"
-    exit 1
-fi
+# Menghitung jumlah file yang di-backup
+FILE_COUNT=$(wc -l < "$FILE_LIST")
 
-# Membuat arsip terkompresi
-if ! tar --null -czvf "$ARCHIVE_PATH" -T "$FILE_LIST"; then
-    echo "Backup gagal."
-    rm -f "$FILE_LIST"
-    exit 1
-fi
+# 5. Mengarsipkan dan mengompresi file hasil pencarian
+tar -czvf "$ARCHIVE_PATH" -T "$FILE_LIST"
 
-# Memeriksa isi arsip tanpa mengekstrak
+# 6. Verifikasi isi arsip tanpa mengekstraknya
+echo "=== Verifikasi Isi Arsip ==="
 tar -tzvf "$ARCHIVE_PATH"
 
-# Menghitung ukuran arsip
-SIZE=$(du -h "$ARCHIVE_PATH" | cut -f1)
+# Mengambil ukuran file arsip
+ARCHIVE_SIZE=$(du -h "$ARCHIVE_PATH" | cut -f1)
 
-# Mencatat hasil backup ke log, satu baris setiap proses
-echo "$DATETIME | $ARCHIVE | $FILE_COUNT | $SIZE" >> "$LOG_FILE"
+# 7. Mencatat proses backup ke file log (1 baris per eksekusi)
+echo "${LOG_DATE} | ${ARCHIVE_NAME} | ${FILE_COUNT} | ${ARCHIVE_SIZE}" >> "$LOG_FILE"
 
-# Menghapus arsip lama, menyisakan lima arsip terbaru
-cd "$BACKUP_DIR" || exit 1
-ls -1t backup_09011182328012_*.tar.gz 2>/dev/null |
-    tail -n +6 |
-    while IFS= read -r old_archive; do
-        rm -f -- "$old_archive"
-    done
-
-rm -f "$FILE_LIST"
-
-echo "Backup selesai: $ARCHIVE"
-echo "Jumlah file: $FILE_COUNT"
-echo "Ukuran arsip: $SIZE"
-
+# Fitur Pengembangan 2: Rotasi arsip (hanya menyimpan 5 arsip terbaru)
+ls -1t "${BACKUP_DIR}"/backup_"${NIM}"_*.tar.gz 2>/dev/null | tail -n +6 | xargs -r rm -f --
